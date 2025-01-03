@@ -55,11 +55,24 @@ app.post('/userInfo', auth.findUserData);
 
 app.get('/getAllUserInfo', auth.getAllUser); 
 
-app.get('/getAllMessage', (req, res) => {
-    sendAllMessage(pool, res)
+app.post('/getAllMessage', (req, res) => {
+    let {room_id} = req.body; 
+    console.log(room_id); 
+    sendAllMessage(pool, res, room_id); 
 })
 
 app.get('/report', liveData); 
+
+app.get('/deleteChat', (req, res) => {
+    pool.query('DELETE FROM chat', (err, results) => {
+        if (err)
+        {
+            res.status(400).send(err); 
+            return; 
+        }
+        res.status(200).send({success:'success'}); 
+    })
+})
 
 
 setupWebSocket(server);
@@ -71,12 +84,12 @@ server.listen(process.env.PORT , '0.0.0.0', () => {
 
 
 
-function sendAllMessage(pool, res)
-{
-    pool.query('select author, timestamp, message_status, point, sticker, message from chat JOIN users on chat.author = users.username', (err, results) => {
+function sendAllMessage(pool, res, room_id)
+{   
+    pool.query('select author, timestamp, message_status, point, sticker, message from chat JOIN users on chat.author = users.username where chat.chat_room_id = $1', [room_id], (err, results) => {
         if (err) {
             console.error('Error executing query:', err.stack); // 處理資料庫錯誤
-            ws.send(JSON.stringify({
+            res.send(JSON.stringify({
                 status: 'error',
                 message: 'Failed to retrieve messages from the database'
             }));

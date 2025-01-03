@@ -63,26 +63,26 @@ function setupWebSocket(server) {
 
         ws.send(JSON.stringify(user)); 
 
-        pool.query('select author, timestamp, message_status, point, sticker, message from chat JOIN users on chat.author = users.username', (err, results) => {
-            if (err) {
-                console.error('Error executing query:', err.stack); // 處理資料庫錯誤
-                ws.send(JSON.stringify({
-                    status: 'error',
-                    message: 'Failed to retrieve messages from the database'
-                }));
-            } else {
-                // 查詢成功，將結果發送給所有已連接的用戶
-                const messages = results.rows; // 假設結果存儲在 rows 中
-                const messageData = {
-                    status: 'success',
-                    context: 'chatHistory',
-                    messages
-                };
+        // pool.query('select author, timestamp, message_status, point, sticker, message, chat_room_id from chat JOIN users on chat.author = users.username', (err, results) => {
+        //     if (err) {
+        //         console.error('Error executing query:', err.stack); // 處理資料庫錯誤
+        //         ws.send(JSON.stringify({
+        //             status: 'error',
+        //             message: 'Failed to retrieve messages from the database'
+        //         }));
+        //     } else {
+        //         // 查詢成功，將結果發送給所有已連接的用戶
+        //         const messages = results.rows; // 假設結果存儲在 rows 中
+        //         const messageData = {
+        //             status: 'success',
+        //             context: 'chatHistory',
+        //             messages
+        //         };
         
-                // 廣播給所有已連接的 WebSocket 用戶
-                ws.send(JSON.stringify(messageData));
-            }
-        });
+        //         // 廣播給所有已連接的 WebSocket 用戶
+        //         ws.send(JSON.stringify(messageData));
+        //     }
+        // });
         
 
         // 當接收到客戶端的訊息時
@@ -91,12 +91,13 @@ function setupWebSocket(server) {
             const parsedMessage = JSON.parse(message.toString());
             
             // 從解析後的物件中解構提取 token 和 message 字段
-            const { token, message: word, username, sticker} = parsedMessage;
+            const { token, message: word, username, sticker, room_id} = parsedMessage;
     
             console.log('Received message:', word);
             console.log('Token:', token);
             console.log('username', username); 
             console.log('sticker', sticker);
+            console.log('room_id', room_id); 
 
         
             // 創建訊息物件
@@ -106,7 +107,8 @@ function setupWebSocket(server) {
                 uuid,
                 username,  
                 word, 
-                sticker
+                sticker, 
+                room_id
             };
 
 
@@ -125,7 +127,7 @@ function setupWebSocket(server) {
         })
 
         // 插入資料到資料庫
-        pool.query('INSERT INTO chat (author, message) VALUES ($1, $2)', [author, word], (err, result) => {
+        pool.query('INSERT INTO chat (author, message, chat_room_id) VALUES ($1, $2, $3)', [author, word, room_id], (err, result) => {
             if (err) {
                 console.error('Error executing query:', err.stack);  // 處理資料庫錯誤
                 ws.send(JSON.stringify({
@@ -136,7 +138,7 @@ function setupWebSocket(server) {
                 console.log('Message inserted successfully');
                 console.log(msg); 
                 // 成功插入後廣播給所有用戶
-                sendAllUsers(wss1, msg, uuid);
+                sendAllUsers(wss1, msg, uuid, room_id);
             }
         });
         });
